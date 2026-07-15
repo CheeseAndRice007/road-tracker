@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Road Tracker</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+html,body,#map{
+    height:100%;
+    margin:0;
+    padding:0;
+}
+
+#map{
+    z-index:1;
+}
+
+#panel{
+    position:absolute;
+    top:15px;
+    left:15px;
+    z-index:1000;
+    background:white;
+    border-radius:12px;
+    padding:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,.3);
+    font-family:Arial;
+}
+
+.vehicle svg{
+    width:42px;
+    height:42px;
+    transform-origin:center center;
+}
+
+button{
+    padding:10px 18px;
+    margin-top:8px;
+    font-size:16px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div id="panel">
+<b>Road Tracker</b><br><br>
+
+GPS:
+<span id="gps">Waiting...</span><br>
+
+Accuracy:
+<span id="acc">--</span><br><br>
+
+<button onclick="centre()">Centre Map</button>
+
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+const map=L.map('map').setView([-33.86,151.20],18);
+
+L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{
+maxZoom:20,
+attribution:'© OpenStreetMap'
+}).addTo(map);
+
+const car=L.divIcon({
+className:'vehicle',
+iconSize:[42,42],
+iconAnchor:[21,21],
+html:`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<rect x="18" y="8" width="28" height="48" rx="10" fill="white" stroke="#333" stroke-width="2"/>
+<rect x="22" y="12" width="20" height="10" rx="2" fill="#9fd3ff"/>
+<rect x="22" y="42" width="20" height="10" rx="2" fill="#9fd3ff"/>
+<circle cx="20" cy="18" r="3"/>
+<circle cx="44" cy="18" r="3"/>
+<circle cx="20" cy="46" r="3"/>
+<circle cx="44" cy="46" r="3"/>
+<polygon points="32,2 27,10 37,10" fill="red"/>
+</svg>
+`
+});
+
+const marker=L.marker([-33.86,151.20],{icon:car}).addTo(map);
+
+let latestPosition=null;
+
+navigator.geolocation.watchPosition(
+
+function(pos){
+
+const lat=pos.coords.latitude;
+const lon=pos.coords.longitude;
+
+latestPosition=[lat,lon];
+
+marker.setLatLng(latestPosition);
+
+map.setView(latestPosition);
+
+document.getElementById("gps").innerHTML="Connected";
+document.getElementById("acc").innerHTML=Math.round(pos.coords.accuracy)+" m";
+
+const heading=pos.coords.heading;
+
+const svg=marker.getElement().querySelector("svg");
+
+if(heading!=null && !isNaN(heading))
+svg.style.transform="rotate("+heading+"deg)";
+
+},
+
+function(err){
+
+document.getElementById("gps").innerHTML=err.message;
+
+},
+
+{
+
+enableHighAccuracy:true,
+maximumAge:1000,
+timeout:15000
+
+});
+
+function centre(){
+
+if(latestPosition)
+map.setView(latestPosition);
+
+}
+
+</script>
+
+</body>
+</html>
