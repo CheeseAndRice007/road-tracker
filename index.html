@@ -4,31 +4,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Road Tracker v0.6</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<title>Road Tracker v0.7</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 html,body,#map{height:100%;margin:0;font-family:Segoe UI,Arial;background:#111}
-#panel{position:absolute;top:14px;left:14px;z-index:1000;width:320px;
-background:rgba(20,20,24,.86);color:#fff;padding:16px;border-radius:18px;
-backdrop-filter:blur(10px);box-shadow:0 8px 20px rgba(0,0,0,.35)}
+#panel{position:absolute;top:14px;left:14px;z-index:1000;width:340px;
+background:rgba(18,18,22,.88);color:#fff;padding:16px;border-radius:18px;
+backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.35)}
 h2{margin:0 0 10px}
+input,select{width:100%;padding:8px;border-radius:8px;border:none;margin:4px 0 8px;box-sizing:border-box}
 .row{display:flex;justify-content:space-between;padding:4px 0}
-.buttons{display:flex;gap:8px;margin-top:12px}
+.buttons{display:flex;gap:8px;margin-top:10px}
 button{flex:1;padding:11px;border:none;border-radius:10px;color:#fff;font-weight:700}
 #start{background:#16a34a}#pause{background:#ca8a04}#stop{background:#dc2626}
-.vehicle svg{width:42px;height:42px;transform-origin:center center;}
+.vehicle svg{width:42px;height:42px;transform-origin:center center}
 </style>
-</head><body>
+</head>
+<body>
 <div id="panel">
-<h2>🚗 Road Tracker v0.6</h2>
+<h2>🚗 Road Tracker v0.7</h2>
+<label>Survey Name</label>
+<input id="survey" placeholder="Road Inspection">
+<label>Breadcrumb Spacing</label>
+<select id="spacing">
+<option value="5">5 m</option>
+<option value="10" selected>10 m</option>
+<option value="20">20 m</option>
+<option value="50">50 m</option>
+</select>
 <div class="row"><span>Status</span><span id="status">Idle</span></div>
-<div class="row"><span>GPS</span><span id="gps">Searching…</span></div>
-<div class="row"><span>Accuracy</span><span id="acc">--</span></div>
-<div class="row"><span>Speed</span><span id="speed">0 km/h</span></div>
 <div class="row"><span>Distance</span><span id="dist">0.00 km</span></div>
-<div class="row"><span>Time</span><span id="time">00:00:00</span></div>
-<div class="row"><span>Dots</span><span>Every 10 m</span></div>
+<div class="row"><span>Speed</span><span id="speed">0 km/h</span></div>
+<div class="row"><span>Accuracy</span><span id="acc">--</span></div>
 <div class="buttons">
 <button id="start">START</button>
 <button id="pause">PAUSE</button>
@@ -39,49 +47,38 @@ button{flex:1;padding:11px;border:none;border-radius:10px;color:#fff;font-weight
 <script>
 const map=L.map('map',{zoomControl:false}).setView([0,0],18);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(map);
-
-const icon=L.divIcon({className:'vehicle',iconSize:[42,42],iconAnchor:[21,21],html:`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-<rect x="18" y="8" width="28" height="48" rx="10" fill="#fff" stroke="#222" stroke-width="2"/>
-<rect x="22" y="12" width="20" height="10" rx="2" fill="#99d5ff"/>
-<rect x="22" y="42" width="20" height="10" rx="2" fill="#99d5ff"/>
-<circle cx="20" cy="18" r="3"/><circle cx="44" cy="18" r="3"/><circle cx="20" cy="46" r="3"/><circle cx="44" cy="46" r="3"/>
-<polygon points="32,3 27,10 37,10" fill="#ff3b30"/></svg>`});
+const icon=L.divIcon({className:'vehicle',iconSize:[42,42],iconAnchor:[21,21],html:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="18" y="8" width="28" height="48" rx="10" fill="white" stroke="#222" stroke-width="2"/><rect x="22" y="12" width="20" height="10" rx="2" fill="#9fd3ff"/><rect x="22" y="42" width="20" height="10" rx="2" fill="#9fd3ff"/><circle cx="20" cy="18" r="3"/><circle cx="44" cy="18" r="3"/><circle cx="20" cy="46" r="3"/><circle cx="44" cy="46" r="3"/><polygon points="32,3 27,10 37,10" fill="#ff3b30"/></svg>`});
 const marker=L.marker([0,0],{icon}).addTo(map);
-const line=L.polyline([],{color:"#16d34a",weight:5,opacity:1}).addTo(map);
-
-let state="idle",track=[],last=null,dist=0,start=0,pauseAt=0,pauseMs=0,lastDot=0;
-const dotSpacing=10;
+const line=L.polyline([],{color:"#19d35a",weight:5}).addTo(map);
+let state="idle",track=[],last=null,dist=0,lastDot=0,startTime=0;
 function hav(a,b,c,d){const R=6371000,p=Math.PI/180;const dl=(c-a)*p,dn=(d-b)*p;const h=Math.sin(dl/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(dn/2)**2;return 2*R*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));}
-function fmt(ms){let s=Math.floor(ms/1000),h=Math.floor(s/3600);s%=3600;let m=Math.floor(s/60);s%=60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;}
-start.onclick=()=>{if(state==="paused"){pauseMs+=Date.now()-pauseAt;}else{track=[];line.setLatLngs([]);dist=0;last=null;lastDot=0;start=Date.now();pauseMs=0;}state="tracking";status.textContent="Tracking";}
-pause.onclick=()=>{if(state==="tracking"){state="paused";pauseAt=Date.now();status.textContent="Paused";}}
-stop.onclick=()=>{state="idle";status.textContent="Stopped";}
-setInterval(()=>{if(start&&state!=="idle"){const n=state==="paused"?pauseAt:Date.now();time.textContent=fmt(n-start-pauseMs)}},250);
-
+start.onclick=()=>{track=[];line.setLatLngs([]);dist=0;last=null;lastDot=0;startTime=Date.now();state="tracking";status.textContent="Tracking";}
+pause.onclick=()=>{state="paused";status.textContent="Paused";}
+stop.onclick=()=>{
+ state="stopped";status.textContent="Stopped";
+ localStorage.setItem("lastSurvey",JSON.stringify({name:survey.value||"Untitled",date:new Date().toLocaleString(),distance:(dist/1000).toFixed(2),track:track}));
+ alert("Survey saved to browser.");
+};
 navigator.geolocation.watchPosition(pos=>{
  const p=[pos.coords.latitude,pos.coords.longitude];
- marker.setLatLng(p);
- map.panTo(p,{animate:true,duration:.4});
- gps.textContent="Connected";
- acc.textContent=Math.round(pos.coords.accuracy)+" m";
+ marker.setLatLng(p);map.panTo(p,{animate:true,duration:.4});
  speed.textContent=((pos.coords.speed||0)*3.6).toFixed(1)+" km/h";
+ acc.textContent=Math.round(pos.coords.accuracy)+" m";
  const svg=marker.getElement()?.querySelector("svg");
  if(svg&&pos.coords.heading!=null&&!isNaN(pos.coords.heading))svg.style.transform="rotate("+pos.coords.heading+"deg)";
  if(state==="tracking"){
-   if(last) dist+=hav(last[0],last[1],p[0],p[1]);
-   last=p;
-   track.push(p);
-   line.setLatLngs(track);
-   if(dist-lastDot>=dotSpacing){
-      L.circleMarker(p,{radius:3,color:"#00ff66",fillColor:"#00ff66",fillOpacity:1,weight:1})
-      .bindPopup("Distance: "+(dist/1000).toFixed(2)+" km<br>Accuracy: "+Math.round(pos.coords.accuracy)+" m<br>Speed: "+((pos.coords.speed||0)*3.6).toFixed(1)+" km/h")
+   if(last)dist+=hav(last[0],last[1],p[0],p[1]);
+   last=p;track.push(p);line.setLatLngs(track);distEl.textContent=(dist/1000).toFixed(2)+" km";
+   let spacing=parseFloat(document.getElementById("spacing").value);
+   if(dist-lastDot>=spacing){
+      L.circleMarker(p,{radius:3,color:"#00ff66",fillColor:"#00ff66",fillOpacity:1})
+      .bindPopup("<b>"+(survey.value||"Survey")+"</b><br>"+new Date().toLocaleTimeString()+"<br>"+Math.round(pos.coords.accuracy)+" m accuracy")
       .addTo(map);
       lastDot=dist;
    }
-   distEl.textContent=(dist/1000).toFixed(2)+" km";
  }
 },{enableHighAccuracy:true,maximumAge:1000,timeout:15000});
 const distEl=document.getElementById("dist");
 </script>
-</body></html>
+</body>
+</html>
