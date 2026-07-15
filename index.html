@@ -2,160 +2,98 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Road Tracker</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Road Tracker v0.5</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
-<style>
-html,body,#map{
-    height:100%;
-    margin:0;
-    padding:0;
-}
-
-#map{
-    z-index:1;
-}
-
-#panel{
-    position:absolute;
-    top:15px;
-    left:15px;
-    z-index:1000;
-    background:white;
-    border-radius:12px;
-    padding:12px;
-    box-shadow:0 2px 10px rgba(0,0,0,.3);
-    font-family:Arial;
-}
-
-.vehicle svg{
-    width:42px;
-    height:42px;
-    transform-origin:center center;
-}
-
-button{
-    padding:10px 18px;
-    margin-top:8px;
-    font-size:16px;
-}
-</style>
-
-</head>
-
-<body>
-
-<div id="panel">
-<b>Road Tracker</b><br><br>
-
-GPS:
-<span id="gps">Waiting...</span><br>
-
-Accuracy:
-<span id="acc">--</span><br><br>
-
-<button onclick="centre()">Centre Map</button>
-
-</div>
-
-<div id="map"></div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+<style>
+html,body,#map{height:100%;margin:0;background:#111;font-family:Segoe UI,Arial,sans-serif}
+#map{z-index:1}
+#panel{
+position:absolute;top:15px;left:15px;z-index:1000;
+width:290px;padding:16px;border-radius:18px;
+background:rgba(25,25,30,.82);color:#fff;
+backdrop-filter:blur(10px);
+box-shadow:0 8px 24px rgba(0,0,0,.35)}
+h2{margin:0 0 12px;font-size:22px}
+.row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.label{opacity:.75}
+.value{font-weight:600}
+.buttons{display:flex;gap:8px;margin-top:14px}
+button{flex:1;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:700;color:#fff;cursor:pointer}
+#start{background:#18a34a}#pause{background:#d7a100}#stop{background:#d53a35}
+.vehicle svg{width:42px;height:42px;transform-origin:center center;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+</style>
+</head>
+<body>
+<div id="panel">
+<h2>🚗 Road Tracker</h2>
+<div class="row"><span class="label">GPS</span><span class="value" id="gps">Searching…</span></div>
+<div class="row"><span class="label">Accuracy</span><span class="value" id="acc">--</span></div>
+<div class="row"><span class="label">Speed</span><span class="value" id="speed">0 km/h</span></div>
+<div class="row"><span class="label">Distance</span><span class="value" id="dist">0.00 km</span></div>
+<div class="row"><span class="label">Time</span><span class="value" id="time">00:00:00</span></div>
+<div class="buttons">
+<button id="start">START</button>
+<button id="pause">PAUSE</button>
+<button id="stop">STOP</button>
+</div>
+</div>
+<div id="map"></div>
 <script>
+const map=L.map('map',{zoomControl:false}).setView([0,0],18);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20}).addTo(map);
 
-const map=L.map('map').setView([-33.86,151.20],18);
-
-L.tileLayer(
-'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-{
-maxZoom:20,
-attribution:'© OpenStreetMap'
-}).addTo(map);
-
-const car=L.divIcon({
+const icon=L.divIcon({
 className:'vehicle',
-iconSize:[42,42],
-iconAnchor:[21,21],
-html:`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-<rect x="18" y="8" width="28" height="48" rx="10" fill="white" stroke="#333" stroke-width="2"/>
-<rect x="22" y="12" width="20" height="10" rx="2" fill="#9fd3ff"/>
-<rect x="22" y="42" width="20" height="10" rx="2" fill="#9fd3ff"/>
-<circle cx="20" cy="18" r="3"/>
-<circle cx="44" cy="18" r="3"/>
-<circle cx="20" cy="46" r="3"/>
-<circle cx="44" cy="46" r="3"/>
-<polygon points="32,2 27,10 37,10" fill="red"/>
-</svg>
-`
+iconSize:[42,42],iconAnchor:[21,21],
+html:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<rect x="18" y="8" width="28" height="48" rx="10" fill="#fff" stroke="#222" stroke-width="2"/>
+<rect x="22" y="12" width="20" height="10" rx="2" fill="#99d5ff"/>
+<rect x="22" y="42" width="20" height="10" rx="2" fill="#99d5ff"/>
+<circle cx="20" cy="18" r="3"/><circle cx="44" cy="18" r="3"/>
+<circle cx="20" cy="46" r="3"/><circle cx="44" cy="46" r="3"/>
+<polygon points="32,3 27,10 37,10" fill="#ff3b30"/></svg>`
 });
+const marker=L.marker([0,0],{icon}).addTo(map);
+const line=L.polyline([],{color:"#24d35a",weight:8,opacity:.65,lineCap:"round"}).addTo(map);
 
-const marker=L.marker([-33.86,151.20],{icon:car}).addTo(map);
+let state="idle",track=[],dist=0,startTime=0,pauseStart=0,pauseMs=0,last=null;
+function hav(a,b,c,d){const R=6371000,p=Math.PI/180;const dl=(c-a)*p,dn=(d-b)*p;const h=Math.sin(dl/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(dn/2)**2;return 2*R*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));}
+function fmt(ms){let s=Math.floor(ms/1000),h=Math.floor(s/3600);s%=3600;let m=Math.floor(s/60);s%=60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;}
 
-let latestPosition = null;
-let track = [];
-let trackLine = L.polyline([], {
-    color: "#00cc44",
-    weight: 6,
-    opacity: 0.8
-}).addTo(map);
+start.onclick=()=>{
+ if(state==="paused"){pauseMs+=Date.now()-pauseStart;}
+ else{track=[];line.setLatLngs([]);dist=0;last=null;pauseMs=0;startTime=Date.now();}
+ state="tracking";
+};
+pause.onclick=()=>{if(state==="tracking"){state="paused";pauseStart=Date.now();}};
+stop.onclick=()=>{state="idle";};
 
-navigator.geolocation.watchPosition(
+setInterval(()=>{
+ if(startTime&&state!=="idle"){
+  const now=state==="paused"?pauseStart:Date.now();
+  time.textContent=fmt(now-startTime-pauseMs);
+ }
+},250);
 
-function(pos){
-
-const lat=pos.coords.latitude;
-const lon=pos.coords.longitude;
-
-latestPosition=[lat,lon];
-
-marker.setLatLng(latestPosition);
-
-track.push(latestPosition);
-trackLine.setLatLngs(track);
-
-map.panTo(latestPosition, {
-    animate: true,
-    duration: 0.5
-});
-
-document.getElementById("gps").innerHTML="Connected";
-document.getElementById("acc").innerHTML=Math.round(pos.coords.accuracy)+" m";
-
-const heading=pos.coords.heading;
-
-const svg=marker.getElement().querySelector("svg");
-
-if(heading!=null && !isNaN(heading))
-svg.style.transform="rotate("+heading+"deg)";
-
-},
-
-function(err){
-
-document.getElementById("gps").innerHTML=err.message;
-
-},
-
-{
-
-enableHighAccuracy:true,
-maximumAge:1000,
-timeout:15000
-
-});
-
-function centre(){
-
-if(latestPosition)
-map.setView(latestPosition);
-
-}
-
+navigator.geolocation.watchPosition(pos=>{
+ const p=[pos.coords.latitude,pos.coords.longitude];
+ marker.setLatLng(p);
+ map.panTo(p,{animate:true,duration:.4});
+ gps.textContent="Connected";
+ acc.textContent=Math.round(pos.coords.accuracy)+" m";
+ speed.textContent=((pos.coords.speed||0)*3.6).toFixed(1)+" km/h";
+ const svg=marker.getElement()?.querySelector("svg");
+ if(svg&&pos.coords.heading!=null&&!isNaN(pos.coords.heading))svg.style.transform="rotate("+pos.coords.heading+"deg)";
+ if(state==="tracking"){
+   if(last)dist+=hav(last[0],last[1],p[0],p[1]);
+   last=p;
+   track.push(p);
+   line.setLatLngs(track);
+   distEl.textContent=(dist/1000).toFixed(2)+" km";
+ }
+},err=>gps.textContent=err.message,{enableHighAccuracy:true,maximumAge:1000,timeout:15000});
+const distEl=document.getElementById("dist");
 </script>
-
-</body>
-</html>
+</body></html>
