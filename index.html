@@ -95,7 +95,13 @@ html:`
 
 const marker=L.marker([-33.86,151.20],{icon:car}).addTo(map);
 
-let latestPosition=null;
+let latestPosition = null;
+let track = [];
+let trackLine = L.polyline([], {
+    color: "#00cc44",
+    weight: 6,
+    opacity: 0.8
+}).addTo(map);
 
 navigator.geolocation.watchPosition(
 
@@ -107,6 +113,9 @@ const lon=pos.coords.longitude;
 latestPosition=[lat,lon];
 
 marker.setLatLng(latestPosition);
+
+track.push(latestPosition);
+trackLine.setLatLngs(track);
 
 map.panTo(latestPosition, {
     animate: true,
