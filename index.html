@@ -108,7 +108,10 @@ latestPosition=[lat,lon];
 
 marker.setLatLng(latestPosition);
 
-map.setView(latestPosition);
+map.panTo(latestPosition, {
+    animate: true,
+    duration: 0.5
+});
 
 document.getElementById("gps").innerHTML="Connected";
 document.getElementById("acc").innerHTML=Math.round(pos.coords.accuracy)+" m";
