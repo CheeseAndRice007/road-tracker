@@ -1,1 +1,19 @@
-/* Road Tracker Styles */
+body{
+    border:8px solid red !important;
+}
+<style>
+html,body,#map{height:100%;margin:0;font-family:Segoe UI,Arial;background:#002b36}
+#panel{
+position:absolute;top:14px;left:14px;z-index:1000;
+width:340px;padding:16px;border-radius:18px;
+background:rgba(0,90,180,0.92);
+backdrop-filter:blur(12px);
+color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+h2{margin:0 0 12px}
+input,select{width:100%;box-sizing:border-box;margin:4px 0 8px;padding:8px;border:none;border-radius:8px}
+.row{display:flex;justify-content:space-between;padding:4px 0}
+.buttons{display:flex;gap:8px;margin-top:12px}
+button{flex:1;padding:11px;border:none;border-radius:10px;color:#fff;font-weight:700}
+#start{background:#16a34a}#pause{background:#ca8a04}#stop{background:#dc2626}
+.vehicle svg{width:42px;height:42px;transform-origin:center center;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+</style>
