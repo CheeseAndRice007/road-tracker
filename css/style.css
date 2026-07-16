@@ -1,7 +1,6 @@
 body{
     border:8px solid red !important;
 }
-<style>
 html,body,#map{height:100%;margin:0;font-family:Segoe UI,Arial;background:#002b36}
 #panel{
 position:absolute;top:14px;left:14px;z-index:1000;
@@ -16,4 +15,3 @@ input,select{width:100%;box-sizing:border-box;margin:4px 0 8px;padding:8px;borde
 button{flex:1;padding:11px;border:none;border-radius:10px;color:#fff;font-weight:700}
 #start{background:#16a34a}#pause{background:#ca8a04}#stop{background:#dc2626}
 .vehicle svg{width:42px;height:42px;transform-origin:center center;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
-</style>
