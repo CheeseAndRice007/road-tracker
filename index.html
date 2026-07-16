@@ -52,7 +52,6 @@ const marker=L.marker([-33.8688,151.2093],{icon}).addTo(map);
 const line=L.polyline([],{color:"#16d34a",weight:5,opacity:1}).addTo(map);
 
 let state="idle",track=[],last=null,dist=0,lastDot=0,firstFix=false;
-function hav(a,b,c,d){const R=6371000,p=Math.PI/180;const dl=(c-a)*p,dn=(d-b)*p;const h=Math.sin(dl/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin(dn/2)**2;return 2*R*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));}
 start.onclick=()=>{state="tracking";status.textContent="Tracking";track=[];line.setLatLngs([]);dist=0;last=null;lastDot=0;dist.textContent="0.00 km";}
 pause.onclick=()=>{if(state==="tracking"){state="paused";status.textContent="Paused";}}
 stop.onclick=()=>{state="stopped";status.textContent="Stopped";}
@@ -67,7 +66,7 @@ navigator.geolocation.watchPosition(pos=>{
  if(s&&pos.coords.heading!=null&&!isNaN(pos.coords.heading))s.style.transform="rotate("+pos.coords.heading+"deg)";
  if(state==="tracking"){
    if(last){
-     const d=hav(last[0],last[1],p[0],p[1]);
+     const d=calculateDistance(last[0],last[1],p[0],p[1]);
      if(d>2){
        dist+=d;
        if(dist-lastDot>=parseFloat(spacing.value)){
